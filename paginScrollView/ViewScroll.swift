@@ -14,58 +14,127 @@ class ViewScroll: UIViewController, UIScrollViewDelegate {
 
     @IBOutlet weak var ScrollView: UIScrollView!
     @IBOutlet weak var pageController: UIPageControl!
-    var photo = UIImageView()
+    
+    var photo: [UIImageView] = []
     var pageImages : [String] = []
+    var frontScrollView: [UIScrollView] = []
     var first = false
+    var currentPage = 0
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         pageImages = ["Image0", "Image1", "Image2", "Image3"]
-        pageController.currentPage = 0
+        pageController.currentPage = currentPage
         pageController.numberOfPages = pageImages.count
         print(ScrollView.bounds.size)
         
-        ScrollView.maximumZoomScale = 2
-        ScrollView.minimumZoomScale = 0.5
-        
-        
-        
-        
+       
     }
     
     override func viewDidLayoutSubviews() {
+        
         if first == false {
             first = true
             let pageScrollViewSize = ScrollView.bounds.size
-            ScrollView.contentSize = CGSizeMake(pageScrollViewSize.width * CGFloat(pageImages.count), 0)
+            ScrollView.contentSize = CGSizeMake(pageScrollViewSize.width * CGFloat(pageImages.count), pageScrollViewSize.height)
+            ScrollView.contentOffset = CGPointMake(CGFloat(currentPage) * pageScrollViewSize.width, 0)
             
+            // creat frontScrollView + imgView and add imgView for frontScrollView
             for (var i = 0; i < pageImages.count; i++) {
                 let imgView = UIImageView(image: UIImage(named: pageImages[i] + ".jpg"))
-                imgView.frame = CGRectMake(CGFloat(i) * ScrollView.frame.size.width, 0, ScrollView.frame.size.width, ScrollView.frame.size.height)
+                imgView.frame = CGRectMake(0, 0, ScrollView.frame.size.width, ScrollView.frame.size.height)
                 imgView.contentMode = .ScaleAspectFit
-                ScrollView.addSubview(imgView)
+                self.addTapAndDoubleTapForImgView(imgView)
+                self.photo.append(imgView)
                 
-                if i == 0 {
-                    self.photo = imgView
-                }
+                let fontScrollView = UIScrollView(frame: CGRect(x: CGFloat(i) * ScrollView.frame.size.width, y: 0, width: ScrollView.frame.size.width, height: ScrollView.frame.size.height))
                 
+                fontScrollView.maximumZoomScale = 2
+                fontScrollView.minimumZoomScale = 0.5
+                fontScrollView.delegate = self
                 
+                self.frontScrollView.append(fontScrollView)
+                
+                ScrollView.addSubview(fontScrollView)
+                fontScrollView.addSubview(imgView)
             }
-            print(ScrollView.bounds.size)
         }
+        self.addButtonForView(self.view)
 
+    }
+    
+    
+    func backAction(sender : UIButton) {
+        if(pageController.currentPage != 0) {
+            UIView.animateWithDuration(0.2, animations: {
+                self.pageController.currentPage = self.pageController.currentPage - 1
+                self.ScrollView.contentOffset = CGPointMake(CGFloat(self.pageController.currentPage) * self.ScrollView.frame.size.width, 0)
+            })
+            
+        } else {
+            self.navigationController?.popViewControllerAnimated(true)
+        }
+        
+    }
+    
+    func nextAction(sender : UIButton) {
+        if(pageController.currentPage != pageImages.count) {
+            UIView.animateWithDuration(0.2, animations: {
+                self.pageController.currentPage = self.pageController.currentPage + 1
+                
+                self.ScrollView.contentOffset = CGPointMake(CGFloat(self.pageController.currentPage) * self.ScrollView.frame.size.width, 0)
+            })
+            
+        }
+    }
+    
+    func addTapAndDoubleTapForImgView(imgView : UIImageView) {
+        imgView.userInteractionEnabled = true
+        imgView.multipleTouchEnabled = true
+        
+        let tap = UITapGestureRecognizer(target: self, action: #selector(self.tapImg(_:)))
+        tap.numberOfTapsRequired = 1
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(self.doubleTapImg(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        
+        tap.requireGestureRecognizerToFail(doubleTap)
+        
+        imgView.addGestureRecognizer(tap)
+        imgView.addGestureRecognizer(doubleTap)
+    }
+    
+    func addButtonForView(view : UIView) {
+        let backButton = UIButton(frame: CGRect(x: 0, y: ScrollView.frame.size.height / 2.0, width: 40, height: 40))
+        backButton.setBackgroundImage(UIImage(named: "back.png"), forState: .Normal)
+        backButton.addTarget(self, action: #selector(self.backAction(_:)), forControlEvents: .TouchUpInside)
+        
+        let nextButton = UIButton(frame: CGRect(x: ScrollView.frame.size.width, y: ScrollView.frame.size.height / 2.0, width: 40, height: 40))
+        nextButton.setBackgroundImage(UIImage(named: "next.png"), forState: .Normal)
+        nextButton.addTarget(self, action: #selector(self.nextAction(_:)), forControlEvents: .TouchUpInside)
+        
+        view.addSubview(nextButton)
+        view.addSubview(backButton)
+        
     }
 
     @IBAction func onChange(sender: AnyObject) {
         ScrollView.contentOffset = CGPointMake(CGFloat(pageController.currentPage) * ScrollView.frame.size.width, 0)
     }
     
-    func onTap(tapGesture : UITapGestureRecognizer) {
-        let point = tapGesture.locationInView(self.photo)
-        zoomRectForScale(ScrollView.zoomScale * 2, center: point)
-    }
+    
     
     func viewForZoomingInScrollView(scrollView: UIScrollView) -> UIView? {
-        return self.photo
+        return self.photo[self.pageController.currentPage]
+    }
+    
+    func tapImg(gesture : UITapGestureRecognizer) {
+        let point = gesture.locationInView(photo[self.pageController.currentPage])
+        zoomRectForScale(self.frontScrollView[self.pageController.currentPage].zoomScale * 1.5, center: point)
+    }
+    
+    func doubleTapImg(gesture : UITapGestureRecognizer) {
+        let point = gesture.locationInView(photo[self.pageController.currentPage])
+        zoomRectForScale(self.frontScrollView[self.pageController.currentPage].zoomScale * 0.5, center: point)
     }
     
     func zoomRectForScale(scale : CGFloat, center : CGPoint) {
@@ -75,7 +144,7 @@ class ViewScroll: UIViewController, UIScrollViewDelegate {
         zoomRect.size.height = scrollViewSize.height / scale
         zoomRect.origin.x = center.x - zoomRect.size.width / 2.0
         zoomRect.origin.y = center.y - zoomRect.size.height / 2.0
-        self.ScrollView.zoomToRect(zoomRect, animated: true)
+        self.frontScrollView[pageController.currentPage].zoomToRect(zoomRect, animated: true)
     }
     
     func scrollViewDidScroll(scrollView: UIScrollView) {
